@@ -35,6 +35,9 @@ Machine *machine;	// user program memory and registers
 PostOffice *postOffice;
 #endif
 
+// Begin code changes by Anthony Guarino
+extern int aFlag = 0;
+// End code changes by Anthony Guarino
 
 // External definition, to allow us to take a pointer to this function
 extern void Cleanup();
@@ -91,7 +94,6 @@ Initialize(int argc, char **argv)
     double rely = 1;		// network reliability
     int netname = 0;		// UNIX socket name
 #endif
-    
     for (argc--, argv++; argc > 0; argc -= argCount, argv += argCount) {
 	argCount = 1;
 	if (!strcmp(*argv, "-d")) {
@@ -99,15 +101,30 @@ Initialize(int argc, char **argv)
 		debugArgs = "+";	// turn on all debug flags
 	    else {
 	    	debugArgs = *(argv + 1);
-	    	argCount = 2;
+	    	argCount += 1; // Code changed by Anthony Guarino
 	    }
 	} else if (!strcmp(*argv, "-rs")) {
 	    ASSERT(argc > 1);
 	    RandomInit(atoi(*(argv + 1)));	// initialize pseudo-random
 						// number generator
 	    randomYield = TRUE;
-	    argCount = 2;
-	}
+	    argCount += 1; // Code changed by Anthony Guarino
+	} else if (!strcmp(*argv, "-A")) { // Begin code changes by Anthony Guarino
+	    ASSERT(argc > 1);
+        if(!strcmp(*(argv + 1), "1")) {
+            aFlag = 1;
+        }
+        else if(!strcmp(*(argv + 1) , "2")) {
+            aFlag = 2;
+        }
+        argCount += 1;
+	} else {
+	    printf("\nYou have entered an invalid argument. Exiting...\n");
+	    Exit(0);
+	} // End code changes by Anthony Guarino
+
+
+
 #ifdef USER_PROGRAM
 	if (!strcmp(*argv, "-s"))
 	    debugUserProg = TRUE;

@@ -316,10 +316,18 @@ threadtest.o: ../threads/threadtest.cc /usr/include/stdc-predef.h \
  /usr/include/x86_64-linux-gnu/bits/struct_rwlock.h /usr/include/alloca.h \
  /usr/include/x86_64-linux-gnu/bits/stdlib-float.h \
  /usr/include/c++/9/bits/std_abs.h /usr/include/c++/9/cctype \
- /usr/include/ctype.h ../threads/copyright.h ../threads/system.h \
- ../threads/utility.h ../threads/bool.h ../machine/sysdep.h \
- ../threads/copyright.h /usr/include/stdio.h ../threads/stdarg.h \
- /usr/include/x86_64-linux-gnu/bits/types/__fpos_t.h \
+ /usr/include/ctype.h /usr/include/c++/9/new /usr/include/c++/9/exception \
+ /usr/include/c++/9/bits/exception.h \
+ /usr/include/c++/9/bits/exception_ptr.h \
+ /usr/include/c++/9/bits/exception_defines.h \
+ /usr/include/c++/9/bits/cxxabi_init_exception.h \
+ /usr/include/c++/9/typeinfo /usr/include/c++/9/bits/hash_bytes.h \
+ /usr/include/c++/9/bits/nested_exception.h \
+ /usr/include/c++/9/bits/move.h /usr/include/c++/9/bits/concept_check.h \
+ /usr/include/c++/9/type_traits ../threads/copyright.h \
+ ../threads/system.h ../threads/utility.h ../threads/bool.h \
+ ../machine/sysdep.h ../threads/copyright.h /usr/include/stdio.h \
+ ../threads/stdarg.h /usr/include/x86_64-linux-gnu/bits/types/__fpos_t.h \
  /usr/include/x86_64-linux-gnu/bits/types/__mbstate_t.h \
  /usr/include/x86_64-linux-gnu/bits/types/__fpos64_t.h \
  /usr/include/x86_64-linux-gnu/bits/types/__FILE.h \

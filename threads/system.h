@@ -17,6 +17,7 @@
 #include "timer.h"
 
 // Initialization and cleanup routines
+extern int aFlag;
 extern void Initialize(int argc, char **argv); 	// Initialization,
 						// called before anything else
 extern void Cleanup();				// Cleanup, called when

@@ -11,6 +11,7 @@
 
 #include <cstdlib>
 #include <cctype>
+#include <new>
 #include "copyright.h"
 #include "system.h"
 
@@ -92,52 +93,21 @@ int InputChecker(char string[256]) {
     return type;
 }
 
+
 void InputTest(int i)
 {
     while (true) {
         char string[256];
-        printf("Please input anything then press ENTER: ");
-        scanf("%s", string);
+        while (true) {
+            memset(&string[0], 0, sizeof(string)); // clear string (fixes bug where fgets detects '\n')
+            printf("Please input anything then press ENTER: ");
+            fgets(string, sizeof(string), stdin);
+            if (string[0] == '\n') {
+                printf("That was not a valid input. Let's try this again...\n");
+            }
+            else {break;}
+        }
 
-        /* Code block, you were too good for this world. You will be missed.
-       int type; // stores type of input
-       // check if input is "0"
-       if (strcmp(string, "0") == 0) { // checks if user input is 0 because atoi returns 0 if not an int
-           type = 2; // just saying zero is a positive int. let the math nerd war commence.
-       }
-       else { // input is NOT 0
-           double doubleAttempt = atof(string); // attempt to convert string to double
-
-           if (doubleAttempt == 0) { // string could not be converted to double
-               if (strlen(string) == 1) { // checking length of character (string)
-                   type = 0; // input is a character
-               }
-               else {
-                   type = 1; // input is a character string
-               }
-           }
-           else { // string could be converted to long
-               int intAttempt = atoi(string); // try to convert string to int
-
-               if (intAttempt == 0) { // could not convert string to int, but is decimal
-                   if (doubleAttempt >= 0) {
-                       type = 4; // mark type as positive decimal
-                   }
-                   else {
-                       type = 5; // mark type as negative decimal
-                   }
-               }
-               else { // successfully converted string to int
-                   if (intAttempt >= 0) { // check sign of input
-                       type = 2; // input is a positive int
-                   }
-                   else {
-                       type = 3; // input is a negative int
-                   }
-               }
-           }
-       }
-       */
 
         int type = InputChecker(string);
 
@@ -168,14 +138,14 @@ void InputTest(int i)
         // repeats section if wanted
         char repeatInput;
         while (true) {
-            clear(); // clears input
-            printf("Next input? (y/n): ");
+            printf("\nNext input? (y/n): ");
             repeatInput = (char)getchar();
+            clear();
             if (repeatInput == 'y' || repeatInput == 'n') {
                 break;
             }
             else {
-                printf("That was not a valid input. Let's try this again...\n");
+                printf("\nThat was not a valid input. Let's try this again...");
             }
 
         }
@@ -185,10 +155,12 @@ void InputTest(int i)
     currentThread->Finish();
 }
 
+
 int yieldTimeGen() { // generates random number between 3-6
     // rand = (Random() % (max + 1 - min)) + min
     return (Random() % (4)) + 3;
 }
+
 
 void Shouter(int repeatTimes) {
     // Putting all of my quotes into one big array because I am lazy ¯\_(ツ)_/¯
@@ -260,30 +232,35 @@ void Shouter(int repeatTimes) {
 }
 
 
-
 void ShoutThreads(int i) {
-
     char threadCountInput[16];
     char shoutCountInput[16];
 
-    int threadCount;
-    int shoutCount;
+    long int threadCount;
+    long int shoutCount;
 
     while (true) {
-        printf("\nEnter thread count (between 2 and 2147483647): ");
-        scanf("%16s", threadCountInput);
 
+        printf("\nEnter thread count (between 2 and 2147483646): ");
+        scanf("%10s", threadCountInput);
+        clear();
 
-        printf("\nEnter shout count (between 2 and 2147483647): ");
-        scanf("%16s", shoutCountInput);
+        printf("\nEnter shout count (between 2 and 2147483646): ");
+        scanf("%10s", shoutCountInput);
+        clear();
+
 
         // Checking and storing input
         if (InputChecker(threadCountInput) == 2 && InputChecker(shoutCountInput) == 2) // threadCount
         {
-            threadCount = atoi(threadCountInput);
-            shoutCount = atoi(shoutCountInput);
-            if (threadCount > 1 && shoutCount > 1 && threadCount <= 2147483647 && shoutCount <= 2147483647) {
+            threadCount = strtol(threadCountInput, nullptr, 10);
+            shoutCount = strtol(shoutCountInput, nullptr, 10);
+
+            if (threadCount > 1 && shoutCount > 1 && threadCount < 2147483647 && shoutCount < 2147483647) {
                 break;
+            }
+            else {
+                printf("\nThat was not a valid input. Let's try this again...");
             }
         }
         else {
@@ -308,7 +285,6 @@ void ShoutThreads(int i) {
 // ThreadTest
 // 	Invoke a test routine.
 //----------------------------------------------------------------------
-
 void
 ThreadTest()
 {
@@ -320,19 +296,19 @@ ThreadTest()
     SimpleThread(0);
 
     // Begin code changes by Anthony Guarino
+    if (aFlag == 1) {
+        Thread *t2 = new Thread("InputTest");
+        t2->Fork(InputTest, 0);
+    }
 
-    Thread *t2 = new Thread("InputTest");
-
-
-    t2->Fork(InputTest, 0);
-
-    Thread *t3 = new Thread("ShoutThreads");
-    t3->Fork(ShoutThreads, 0);
+    if (aFlag == 2) {
+        Thread *t3 = new Thread("ShoutThreads");
+        t3->Fork(ShoutThreads, 0);
+    }
 
     // End code changes by Anthony Guarino
 
  }
-
 
 
 #pragma clang diagnostic pop
