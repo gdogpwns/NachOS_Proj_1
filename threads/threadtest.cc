@@ -78,14 +78,16 @@ int InputChecker(char string[256]) {
             charFlag = true;
             break;
         }
+        else if (!isdigit(string[i])) {charFlag = true;}
     }
 
     if (length > 1 && decLoc == length - 1) {charFlag = true;} // if only decimal is the last pos in string, then char
 
     if (charFlag && length == 1) {type = 0;} // has chars, length =1 -> character
+    else if (dashFlag && length == 1) {type = 0;} // only a dash -> character
     else if (charFlag && length > 1) {type = 1;} // has chars, length >1 -> character string
     else if (!charFlag && !dashFlag && decLoc == 0) {type = 2;} //no chars, no dash, no decimal -> positive int
-    else if (!charFlag && dashFlag && decLoc == 0) {type = 3;} // no chars, has dash, no decimal -> negative int
+    else if (!charFlag && dashFlag && decLoc == 0) {type = 3;} // no chars, has dash, no decimal, input
     else if (!charFlag && !dashFlag && decLoc > 0) {type = 4;} // no chars, no dash, has decimal -> positive decimal
     else if (!charFlag && dashFlag && decLoc > 0) {type = 5;} // no chars, has dash, has decimal -> negative decimal
     else {type = 6;} // error case
@@ -105,7 +107,10 @@ void InputTest(int i)
             if (string[0] == '\n') {
                 printf("That was not a valid input. Let's try this again...\n");
             }
-            else {break;}
+            else {
+                string[strlen(string) - 1] = '\000'; // removes trailing \n from fgets
+                break;
+            }
         }
 
 
