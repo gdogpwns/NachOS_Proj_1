@@ -110,17 +110,29 @@ Initialize(int argc, char **argv)
 	    randomYield = TRUE;
 	    argCount += 1; // Code changed by Anthony Guarino
 	} else if (!strcmp(*argv, "-A")) { // Begin code changes by Anthony Guarino
-	    ASSERT(argc > 1);
-        if(!strcmp(*(argv + 1), "1")) {
-            aFlag = 1;
-        }
-        else if(!strcmp(*(argv + 1) , "2")) {
-            aFlag = 2;
-        }
-        argCount += 1;
-	} else {
-	    printf("\nYou have entered an invalid argument. Exiting...\n");
-	    Exit(0);
+	    //ASSERT(argc > 1);
+	    if (argc > 1) {
+            if(!strcmp(*(argv + 1), "1")) {
+                aFlag = 1;
+            }
+            else if(!strcmp(*(argv + 1) , "2")) {
+                aFlag = 2;
+            }
+            else if(!strcmp(*(argv + 1), "3")) {
+                aFlag = 3;
+            }
+            else if(!strcmp(*(argv + 1), "4")) {
+                aFlag = 4;
+            }
+            else {
+                printf("\nYou have entered an invalid argument. Exiting...\n");
+                Exit(0);
+            }
+            argCount += 1;
+        } else {
+            printf("\nYou have entered an invalid argument. Exiting...\n");
+            Exit(0);
+	    }
 	} // End code changes by Anthony Guarino
 
 

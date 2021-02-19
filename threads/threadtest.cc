@@ -14,6 +14,7 @@
 #include <new>
 #include "copyright.h"
 #include "system.h"
+#include "synch.h"
 
 //----------------------------------------------------------------------
 // SimpleThread
@@ -48,6 +49,8 @@ SimpleThread(int which)
 
 
 // Begin code changes by Anthony Guarino
+
+// Begin Project 1
 
 //----------------------------------------------------------------------
 // InputChecker
@@ -87,7 +90,7 @@ int InputChecker(char string[256]) {
     else if (dashFlag && length == 1) {type = 0;} // only a dash -> character
     else if (charFlag && length > 1) {type = 1;} // has chars, length >1 -> character string
     else if (!charFlag && !dashFlag && decLoc == 0) {type = 2;} //no chars, no dash, no decimal -> positive int
-    else if (!charFlag && dashFlag && decLoc == 0) {type = 3;} // no chars, has dash, no decimal, input
+    else if (!charFlag && dashFlag && decLoc == 0) {type = 3;} // no chars, has dash, no decimal -> negative int
     else if (!charFlag && !dashFlag && decLoc > 0) {type = 4;} // no chars, no dash, has decimal -> positive decimal
     else if (!charFlag && dashFlag && decLoc > 0) {type = 5;} // no chars, has dash, has decimal -> negative decimal
     else {type = 6;} // error case
@@ -102,7 +105,7 @@ void InputTest(int i)
         char string[256];
         while (true) {
             memset(&string[0], 0, sizeof(string)); // clear string (fixes bug where fgets detects '\n')
-            printf("Please input anything then press ENTER: ");
+            printf("Please input anything (<256 characters) then press ENTER: ");
             fgets(string, sizeof(string), stdin);
             if (string[0] == '\n') {
                 printf("That was not a valid input. Let's try this again...\n");
@@ -229,6 +232,7 @@ void Shouter(int repeatTimes) {
         printf("Thread %s: ", threadName);
         printf("%s", quoteArray[randomInRange]); // print random string from quoteArray
         printf("\n");
+
         for (int j = 0; j < yieldTimeGen(); j++) {
             currentThread->Yield();
         }
@@ -271,6 +275,7 @@ void ShoutThreads(int i) {
         else {
             printf("\nThat was not a valid input. Let's try this again...");
         }
+
     }
 
     Thread *t;
@@ -284,6 +289,243 @@ void ShoutThreads(int i) {
 
 
 }
+
+// End Project 1
+
+// Begin Project 2
+
+// Function to make getting string inputs easier
+char* GetStringInput(char toPrint[256]) {
+    char *string = (char*)malloc(sizeof(256));
+    while (true) {
+        memset(&string[0], 0, sizeof(string)); // clear string (fixes bug where fgets detects '\n')
+        printf(toPrint);
+        fgets(string, sizeof(string), stdin);
+        if (string[0] == '\n') {
+            printf("That was not a valid input. Let's try this again...\n");
+        }
+        else {
+            string[strlen(string) - 1] = '\000'; // removes trailing \n from fgets
+            break;
+        }
+    }
+    return string;
+}
+
+int chopsticksAmt;
+bool * chopsticks;
+int meals;
+
+void ReleaseChopsticksBusyWaiting(char *name, bool *chopsticksHeld) {
+    int philosopherInt = atoi(name);
+    if (chopsticksHeld[0]) {
+        printf("\nPhilosopher %s is releasing the chopstick on their left.", name);
+        chopsticks[philosopherInt] = true;
+        // Commenting out this print because it is unnecessary in my opinion
+        //printf("\nPhilosopher %s has released the chopstick on their left.", name);
+    }
+
+    if (chopsticksHeld[1]) {
+        printf("\nPhilosopher %s is releasing the chopstick on their right.", name);
+        chopsticks[(philosopherInt + 1) % chopsticksAmt] = true;
+        // Commenting out this print because it is unnecessary in my opinion
+        //printf("\nPhilosopher %s has released the chopstick on their right.", name);
+    }
+
+}
+
+void BeginThinking(char *name) {
+    printf("\nPhilosopher %s is thinking.", name);
+    for(int i = 0; i < yieldTimeGen(); i++) {
+        currentThread->Yield();
+    }
+}
+
+void LeaveTable(char *name) {
+    printf("\nPhilosopher %s is leaving the table.\n", name); // I don't like printing the blank line like this
+    currentThread->Finish();
+}
+
+void RunBusyWaitingPhilosopher(int which) {
+    char *name = currentThread->getName();
+    int philosopherInt = atoi(name);
+    bool chopsticksHeld[2] = {false, false}; // indicates if philosopher is holding left and/or right chopstick
+
+    printf("\nPhilosopher %s has sat at the table.", name);
+    currentThread->Yield();
+
+    /*
+     * OK, here's the move:
+     * I will check before every pickup if the last meal has been eaten
+     * If all the meals are eaten, I'm gonna send them to release each chopstick they're holding
+     */
+    while (meals >= 1) {
+        printf("\nPhilosopher %s is hungry and trying to pick up the chopstick on their left.", name);
+        while(!chopsticks[philosopherInt]) {currentThread->Yield();}
+        if (meals >= 1) {
+            chopsticks[philosopherInt] = false;
+            chopsticksHeld[0] = true;
+            printf("\nPhilosopher %s has successfully picked up the chopstick on their left.", name);
+        }
+        else {break;}
+
+
+        printf("\nPhilosopher %s is hungry and trying to pick up the chopstick on their right.", name);
+        while(!chopsticks[(philosopherInt + 1) % chopsticksAmt]) {currentThread->Yield();}
+        if (meals >= 1) {
+            chopsticks[(philosopherInt + 1) % chopsticksAmt] = false;
+            chopsticksHeld[1] = true;
+            printf("\nPhilosopher %s has successfully picked up the chopstick on their right.", name);
+        }
+        else {break;}
+
+        printf("\nPhilosopher %s is now eating.", name);
+        meals--;
+        printf("\n%d meal(s) are remaining.", meals);
+        for (int i = 0; i < yieldTimeGen(); i++) {
+            currentThread->Yield();
+        }
+        printf("\nPhilosopher %s is done eating.", name);
+
+        ReleaseChopsticksBusyWaiting(name, chopsticksHeld);
+        chopsticksHeld[0] = false;
+        chopsticksHeld[1] = false;
+        BeginThinking(name);
+    }
+    ReleaseChopsticksBusyWaiting(name, chopsticksHeld);
+    chopsticksHeld[0] = false;
+    chopsticksHeld[1] = false;
+
+
+    // checking to see if all chopsticks have been released
+    for (int i = 0; i < chopsticksAmt; i++) {
+        if (!chopsticks[i]) {
+            i--;
+            currentThread->Yield();
+        }
+    }
+    LeaveTable(name);
+
+}
+
+
+Semaphore **semChopstick;
+void RunSemaphorePhilosopher(int which) {
+    char *name = currentThread->getName();
+    int philosopherInt = atoi(name);
+
+    printf("\nPhilosopher %s has sat at the table.", name);
+    currentThread->Yield();
+
+    printf("\nPhilosopher %s is hungry and trying to pick up the chopstick on their left.", name);
+    semChopstick[philosopherInt]->P();
+    printf("\nPhilosopher %s has successfully picked up the chopstick on their left.", name);
+
+    printf("\nPhilosopher %s is hungry and trying to pick up the chopstick on their right.", name);
+    semChopstick[(philosopherInt + 1) % chopsticksAmt]->P();
+    printf("\nPhilosopher %s has successfully picked up the chopstick on their right.", name);
+
+    while (meals >= 1) {
+        printf("\nPhilosopher %s is now eating.", name);
+        meals--;
+        printf("\n%d meal(s) are remaining.", meals);
+        for (int i = 0; i < yieldTimeGen(); i++) {
+            currentThread->Yield();
+        }
+        printf("\nPhilosopher %s is done eating.", name);
+
+        printf("\nPhilosopher %s is releasing the chopstick on their left.", name);
+        semChopstick[philosopherInt]->V();
+        // Commenting out this print because it is unnecessary in my opinion
+        //printf("\nPhilosopher %s has released the chopstick on their left.", name);
+
+        printf("\nPhilosopher %s is releasing the chopstick on their right.", name);
+        semChopstick[(philosopherInt + 1) % chopsticksAmt]->V();
+        // Commenting out this print because it is unnecessary in my opinion
+        //printf("\nPhilosopher %s has released the chopstick on their right.", name);
+
+        printf("\nPhilosopher %s is thinking.", name);
+        BeginThinking();
+    }
+
+}
+
+void MakePhilosopher(int which) {
+    // Get amount of philosophers
+    char pInputString[256];
+    int pAmt;
+    while(true) {
+        strcpy(pInputString, GetStringInput("\nHow many philosophers will be dining?: "));
+        if (InputChecker(pInputString) == 2) {
+            pAmt = atoi(pInputString);
+            break;
+        }
+        else {printf("\nThat was not a valid input. let's try this again...");}
+    }
+
+    // Get amount of meals
+    char mInputString[256];
+    while(true) {
+        strcpy(mInputString, GetStringInput("\nHow many meals will they be eating?: "));
+        if (InputChecker(mInputString) == 2) {
+            meals = atoi(mInputString);
+            break;
+        }
+        else {printf("\nThat was not a valid input. let's try this again...");}
+    }
+
+    // Guilt trip the end-user if they cook food for an empty table
+    if (pAmt == 0) {
+        printf("\nThe table has been set for nobody. The food is going bad! Remember: only YOU can end food waste!\n");
+        currentThread->Finish();
+    }
+
+    if (meals == 0) {
+        printf("\nI can't believe you would invite %d friend(s) over then let them starve! You're an awful host.\n", pAmt);
+        currentThread->Finish();
+    }
+
+    chopsticksAmt = pAmt;
+    if (which == 0) {
+        // populate chopsticks list
+        chopsticks = new bool[pAmt];
+        for (int i = 0; i < (pAmt); i++) {
+            chopsticks[i] = true;
+        }
+
+        // Create and fork threads
+        Thread *t;
+        char *name;
+        for (int i = 0; i < pAmt; i++) { // create threads
+            name = new char[30];
+            sprintf(name, "%d", i);
+            t = new Thread(name); // creates a new thread with the name created above
+            t->Fork(RunBusyWaitingPhilosopher, 0);
+        }
+    }
+    else if (which == 1) {
+        // populate semChopstick list
+        semChopstick = new Semaphore * [pAmt];
+
+        Thread *t;
+        char *name;
+        for (int i = 0; i < pAmt; i++) {
+            name = new char[30];
+            sprintf(name, "%d", i);
+
+            semChopstick[i] = new Semaphore(name, 1);
+
+            t = new Thread(name);
+            t->Fork(RunSemaphorePhilosopher, 0);
+        }
+
+    }
+
+    currentThread->Finish();
+}
+
+// End Project 2
+
 // End code changes by Anthony Guarino
 
 //----------------------------------------------------------------------
@@ -305,10 +547,17 @@ ThreadTest()
         Thread *t2 = new Thread("InputTest");
         t2->Fork(InputTest, 0);
     }
-
     if (aFlag == 2) {
         Thread *t3 = new Thread("ShoutThreads");
         t3->Fork(ShoutThreads, 0);
+    }
+    if (aFlag == 3) {
+        Thread *t4 = new Thread("MakeBusyWaitingPhilosopher");
+        t4->Fork(MakePhilosopher, 0);
+    }
+    if (aFlag == 4) {
+        Thread *t5 = new Thread("MakeSemaphorePhilosopher");
+        t5->Fork(MakePhilosopher, 1);
     }
 
     // End code changes by Anthony Guarino
