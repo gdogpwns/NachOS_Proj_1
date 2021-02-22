@@ -163,10 +163,17 @@ void InputTest(int i)
     currentThread->Finish();
 }
 
-
+// Should deprecate this function
 int yieldTimeGen() { // generates random number between 3-6
     // rand = (Random() % (max + 1 - min)) + min
     return (Random() % (4)) + 3;
+}
+
+void YieldThreadRandom() {
+    int yieldTime = (Random() % (4)) + 3;
+    for (int i = 0; i < yieldTime; i++) {
+        currentThread->Yield();
+    }
 }
 
 
@@ -296,11 +303,12 @@ void ShoutThreads(int i) {
 
 // Function to make getting string inputs easier
 char* GetStringInput(char toPrint[256]) {
-    char *string = (char*)malloc(sizeof(256));
+    //char string[256];
+    char *string = (char*)malloc(256);
     while (true) {
         memset(&string[0], 0, sizeof(string)); // clear string (fixes bug where fgets detects '\n')
         printf(toPrint);
-        fgets(string, sizeof(string), stdin);
+        fgets(string, 256, stdin);
         if (string[0] == '\n') {
             printf("That was not a valid input. Let's try this again...\n");
         }
@@ -410,6 +418,31 @@ void RunBusyWaitingPhilosopher(int which) {
 
 
 Semaphore **semChopstick;
+Semaphore *chopstickMutex = new Semaphore("chopstickMutex", 1);
+int readyToLeave = 0;
+Semaphore *readyToLeaveSem = new Semaphore("readyToLeave", 0);
+// keeps track of WHO holds WHICH chopstick
+// NULL is indicated by chopsticksAmt + 1
+int * holdingChopstick;
+
+void ReleaseChopsticksSemaphore(char *name) {
+    int philosopherInt = atoi(name);
+
+    if (holdingChopstick[philosopherInt] == philosopherInt) {
+        printf("\nPhilosopher %s is releasing the chopstick on their left.", name);
+        semChopstick[philosopherInt]->V();
+        // Commenting out this print because it is unnecessary in my opinion
+        //printf("\nPhilosopher %s has released the chopstick on their left.", name);
+    }
+
+    if (holdingChopstick[(philosopherInt + 1) % chopsticksAmt] == philosopherInt) {
+        printf("\nPhilosopher %s is releasing the chopstick on their right.", name);
+        semChopstick[(philosopherInt + 1) % chopsticksAmt]->V();
+        // Commenting out this print because it is unnecessary in my opinion
+        //printf("\nPhilosopher %s has released the chopstick on their right.", name);
+    }
+}
+
 void RunSemaphorePhilosopher(int which) {
     char *name = currentThread->getName();
     int philosopherInt = atoi(name);
@@ -417,37 +450,54 @@ void RunSemaphorePhilosopher(int which) {
     printf("\nPhilosopher %s has sat at the table.", name);
     currentThread->Yield();
 
-    printf("\nPhilosopher %s is hungry and trying to pick up the chopstick on their left.", name);
-    semChopstick[philosopherInt]->P();
-    printf("\nPhilosopher %s has successfully picked up the chopstick on their left.", name);
-
-    printf("\nPhilosopher %s is hungry and trying to pick up the chopstick on their right.", name);
-    semChopstick[(philosopherInt + 1) % chopsticksAmt]->P();
-    printf("\nPhilosopher %s has successfully picked up the chopstick on their right.", name);
 
     while (meals >= 1) {
+        printf("\nPhilosopher %s is hungry and trying to pick up the chopstick on their left.", name);
+        if (meals >= 1) {
+            semChopstick[philosopherInt]->P();
+            chopstickMutex->P();
+            holdingChopstick[philosopherInt] = philosopherInt;
+            chopstickMutex->V();
+            printf("\nPhilosopher %s has successfully picked up the chopstick on their left.", name);
+        }
+        else {break;}
+
+
+        printf("\nPhilosopher %s is hungry and trying to pick up the chopstick on their right.", name);
+        if (meals >= 1) {
+            semChopstick[(philosopherInt + 1) % chopsticksAmt]->P();
+            chopstickMutex->P();
+            holdingChopstick[(philosopherInt + 1) % chopsticksAmt] = philosopherInt;
+            chopstickMutex->V();
+            printf("\nPhilosopher %s has successfully picked up the chopstick on their right.", name);
+        }
+        else {break;}
+
+
         printf("\nPhilosopher %s is now eating.", name);
+        chopstickMutex->P();
         meals--;
+        chopstickMutex->V();
         printf("\n%d meal(s) are remaining.", meals);
         for (int i = 0; i < yieldTimeGen(); i++) {
             currentThread->Yield();
         }
         printf("\nPhilosopher %s is done eating.", name);
 
-        printf("\nPhilosopher %s is releasing the chopstick on their left.", name);
-        semChopstick[philosopherInt]->V();
-        // Commenting out this print because it is unnecessary in my opinion
-        //printf("\nPhilosopher %s has released the chopstick on their left.", name);
+        ReleaseChopsticksSemaphore(name);
 
-        printf("\nPhilosopher %s is releasing the chopstick on their right.", name);
-        semChopstick[(philosopherInt + 1) % chopsticksAmt]->V();
-        // Commenting out this print because it is unnecessary in my opinion
-        //printf("\nPhilosopher %s has released the chopstick on their right.", name);
-
-        printf("\nPhilosopher %s is thinking.", name);
-        BeginThinking();
+        BeginThinking(name);
     }
+    ReleaseChopsticksSemaphore(name);
 
+    chopstickMutex->P();
+    readyToLeave++;
+    chopstickMutex->V();
+    if (readyToLeave < chopsticksAmt) {
+        readyToLeaveSem->P();
+    }
+    readyToLeaveSem->V();
+    LeaveTable(name);
 }
 
 void MakePhilosopher(int which) {
@@ -480,6 +530,13 @@ void MakePhilosopher(int which) {
         currentThread->Finish();
     }
 
+    // Guilt trip the end-user if they didn't invite any of the philosopher's friends
+    else if (pAmt == 1) {
+        printf("\nA lone philosopher ponders how to eat with only one chopstick. Too hungry to ponder further, they order a pizza instead.\n");
+        currentThread->Finish();
+    }
+
+    // Guilt trip the end-user if they were too cheap to make any food
     if (meals == 0) {
         printf("\nI can't believe you would invite %d friend(s) over then let them starve! You're an awful host.\n", pAmt);
         currentThread->Finish();
@@ -504,8 +561,10 @@ void MakePhilosopher(int which) {
         }
     }
     else if (which == 1) {
-        // populate semChopstick list
+        // populate semChopstick list and holdingChopstick list
         semChopstick = new Semaphore * [pAmt];
+        holdingChopstick = new int [pAmt];
+
 
         Thread *t;
         char *name;
@@ -514,6 +573,7 @@ void MakePhilosopher(int which) {
             sprintf(name, "%d", i);
 
             semChopstick[i] = new Semaphore(name, 1);
+            holdingChopstick[i] = pAmt; // NULL (see note at declaration)
 
             t = new Thread(name);
             t->Fork(RunSemaphorePhilosopher, 0);
@@ -524,6 +584,323 @@ void MakePhilosopher(int which) {
     currentThread->Finish();
 }
 
+/*
+ * Holds the message text and a bool if there is a message in that slot or not
+ */
+struct Message {
+    char* message = new char[256];
+    bool holdsMessage = false;
+    Semaphore *sem = new Semaphore("mailbox", 1);
+};
+
+/*
+ * Creates a struct to hold mail in a mailbox. Contains a Semaphore and an int to hold a message.
+ * Using an int instead of a string because I am too lazy to think about strings in C right now.
+ */
+struct Mailbox {
+    Message **messages; // to hold list of Messages, amount S
+};
+
+char* GetRandomQuote() {
+    char *quoteArray[50] = {
+            "I am the eggman.",
+            "You take your car to work, I take my board.",
+            "All the girlies say I'm pretty fly (for a white guy).",
+            "Wee ooh, I look just like Buddy Holly.",
+            "Whoa, heaven let your light shine down.",
+            "She's lump! She's lump! She's lump! She's in my head.",
+            "I just wanna fly.",
+            "I'm sorry, Ms. Jackson. (ooh!) I am for real.",
+            "Choose not a life of imitation.",
+            "And my time is a piece of wax falling on a termite that's choking on the splinters.",
+            "I said maybeeeeeeeeeeee ya gonna be the one that saves meeeeeeeeeeeee.",
+            "Ocean man, take me by the hand.",
+            "G-Funk: where rhythm is life, and life is rhythm.",
+            "Nothin' left to do but smile, smile, smile.",
+            "I know who I want to take me home.",
+            "I don't practice Santeria. I ain't got no crystal ball.",
+            "Isn't it ironic? Don't ya think?",
+            "I got two turntables and a microphone.",
+            "Love is shaking on Shakedown Street. Used to be the heart of town.",
+            "Peaches come from a can; they were put there by a man in a factory downtown.",
+            "Mmmbop!",
+            "With the taste of your lips, I'm on a ride.",
+            "Lord, I was born a ramblin' man.",
+            "This isn't who it would be if it wasn't who it is.",
+            "Here's to you, Mrs. Robinson. Jesus loves you more than you would know.",
+            "She can be a belly dancer, I don't need a true romancer.",
+            "I shot the sheriff, but I didn't shoot the deputy.",
+            "I GOT BLISTERS ON MY FINGERS!",
+            "Oops, I did it again!",
+            "GET UP! (Get on up.)",
+            "Jerry was a racecar driver.",
+            "Learn to work the saxophone; I play just what I feel.",
+            "I cannot repeal the words of the golden eel.",
+            "Going back home to the village of the sun. Out in back of Palmdale where the turkey farmers run.",
+            "There's nothing on the top but a bucket and a mop and an illustrated book about birds.",
+            "And I say, HEYYYYEYYYYYEYYYEYEY",
+            "Never gonna give you up. Never gonna let you down.",
+            "Bag it, tag it, sell it to the butcher at the store.",
+            "Marky got with Sharon, Sharon got Sherice. She was sharin' Sharon's outlook on the topic of disease.",
+            "Cool it now! You're gonna lose control.",
+            "Sneaking Sally through the alley, tryin' to get away clean. Sneaking Sally through the alley, when out pops the queen.",
+            "Nigel has his future in a British steel.",
+            "Her left eye is lazy.",
+            "I can ride my bike with no handlebars.",
+            "The butter wouldn't melt so I put it in the pie.",
+            "If they say, 'why, why', tell em that it's human nature.",
+            "You won't let those robots eat me, Yoshimi.",
+            "Bona fide hustler, making my name.",
+            "I've seen footage. I stay noided.",
+            "It goes, it goes, it goes, it goes, guillotineeeeeeee, YUH!"};
+
+    int randomInRange = Random() % 50; // will take Random() result as a seed to choose number between 0-49
+    return quoteArray[randomInRange];
+}
+
+
+Mailbox **boxArr;
+int amtCustomers;
+int amtMessages;
+int amtToSend;
+
+void RunPostOffice(int which) {
+    char *name = currentThread->getName();
+    int custInt = atoi(name);
+    int mailTo = 0;
+
+    while (true) {
+        printf("\nCustomer %s has entered the post office.", name);
+
+        for (int i = 0; i < amtMessages; i++) {
+            if (i == amtMessages - 1 && !boxArr[custInt]->messages[i]->holdsMessage) {
+                printf("\nCustomer %s's mailbox is empty.", name);
+            }
+            else if (boxArr[custInt]->messages[i]->holdsMessage) { // if a message is found, read it
+                printf("\nCustomer %s has mail!", name);
+                printf("\nMessage reads: %s\n", boxArr[custInt]->messages[i]->message); // print message
+                boxArr[custInt]->messages[i]->message = nullptr; // erase message
+                boxArr[custInt]->messages[i]->holdsMessage = false; // mark space as empty
+                boxArr[custInt]->messages[i]->sem->V();
+                currentThread->Yield();
+            }
+        }
+
+        if (amtToSend > 0) {
+            mailTo = (Random() % (amtCustomers));
+            while (mailTo == custInt) {mailTo = (Random() % (amtCustomers));} // makes sure that mailTo != custInt
+
+            printf("\nSending message to Customer %d...", mailTo);
+            for (int i = 0; i < amtMessages; i++) {
+                if (!boxArr[mailTo]->messages[i]->holdsMessage) {
+                    boxArr[mailTo]->messages[i]->sem->P();
+                    //boxArr[mailTo]->messages[i]->message = GetRandomQuote();
+                    boxArr[mailTo]->messages[i]->message = GetRandomQuote();
+                    boxArr[mailTo]->messages[i]->holdsMessage = true;
+                    printf("\nMessage sent successfully!");
+                    amtToSend--;
+                    printf("\n%d message(s) left to send.", amtToSend);
+                    break;
+                }
+                if (i == amtMessages - 1) {
+                    printf("\nMessage send failed: not enough space.");
+                }
+            }
+
+            printf("\nCustomer %s is leaving the post office.\n", name);
+            YieldThreadRandom();
+        }
+        else if (amtToSend == 0) {
+            printf("\nCustomer %s is leaving the post office.\n", name);
+            currentThread->Finish();
+            break; // this break is just to stop an Endless Loop warning
+        }
+    }
+}
+
+void MakePostOffice(int which) {
+    // Get amount of people
+    char pInputString[256];
+    int pAmt;
+    while(true) {
+        strcpy(pInputString, GetStringInput("\nHow many people have mailboxes?: "));
+        //pInputString = GetStringInput("\nHow many people have mailboxes?: ");
+        if (InputChecker(pInputString) == 2) {
+            pAmt = atoi(pInputString);
+            break;
+        }
+        else {printf("\nThat was not a valid input. let's try this again...");}
+    }
+    amtCustomers = pAmt;
+
+    // Get mailbox capacity
+    char sInputString[256];
+    int sAmt;
+    while(true) {
+        strcpy(sInputString, GetStringInput("\nHow many letters can a mailbox hold?: "));
+        if (InputChecker(sInputString) == 2) {
+            sAmt = atoi(sInputString);
+            break;
+        }
+        else {printf("\nThat was not a valid input. let's try this again...");}
+    }
+    amtMessages = sAmt;
+
+    // Get number of messages to be sent
+    char mInputString[256];
+    int mAmt;
+    while(true) {
+        strcpy(mInputString, GetStringInput("\nHow many messages will be sent?: "));
+        if (InputChecker(mInputString) == 2) {
+            mAmt = atoi(mInputString);
+            break;
+        }
+        else {printf("\nThat was not a valid input. let's try this again...");}
+    }
+    amtToSend = mAmt;
+
+    boxArr = new Mailbox * [pAmt];
+
+    // Create and fork threads
+    Thread *t;
+    char *name;
+    for (int i = 0; i < pAmt; i++) { // create threads and mailboxes
+        boxArr[i] = new Mailbox; // create new mailbox at boxArr[i]
+        boxArr[i]->messages = new Message * [sAmt]; // creates sAmt of Message holders in boxArr[i]
+        for (int j = 0; j < sAmt; j++) {
+            boxArr[i]->messages[j] = new Message;
+        }
+
+        name = new char[30];
+        sprintf(name, "%d", i);
+        t = new Thread(name); // creates a new thread with the name created above
+        t->Fork(RunPostOffice, 0);
+    }
+
+}
+
+Semaphore *area = new Semaphore("rw shared semaphore", 1);
+Semaphore *mutex = new Semaphore("readCount mutex", 1);
+Semaphore *readerCap;
+int maxReaders = 0;
+int remainingWriters = 0;
+int readCount = 0;
+int totalReads = 0;
+void RunReader(int which) {
+    char *name = currentThread->getName();
+    int threadInt = atoi(name);
+
+
+    //printf("\nReader %s is trying to enter the buffer area.", name);
+    if (remainingWriters > 0) {
+        readerCap->P();
+    }
+
+
+    mutex->P();
+
+    // Begin reader entry
+    readCount++;
+    if (readCount == 1) {area->P();}
+    mutex->V();
+
+    printf("\nReader %s is reading in the buffer area.", name);
+    currentThread->Yield();
+
+    mutex->P();
+    totalReads++;
+    printf("\nReader %s finished reading.", name);
+    printf(" Total reads: %d", totalReads);
+    // Begin reader exit
+    readCount--;
+    if (readCount == 0) {area->V();}
+    mutex->V();
+
+    currentThread->Finish();
+}
+
+void RunWriter(int which) {
+    char *name = currentThread->getName();
+    int threadInt = atoi(name);
+
+    //printf("\nWriter %s is trying to enter the buffer area.", name);
+    area->P();
+
+    mutex->P();
+    totalReads = 0;
+    remainingWriters--;
+    mutex->V();
+
+    printf("\nWriter %s is writing in the buffer area.", name);
+    currentThread->Yield();
+    printf("\nWriter %s is done writing and leaving the area.\n", name);
+
+    for (int i = 0; i < maxReaders; i++) {
+        readerCap->V();
+    }
+
+    area->V();
+    currentThread->Finish();
+}
+
+void MakeReaderWriter(int which) {
+    // Get amount of readers (R)
+    char rInputString[256];
+    int rAmt;
+    while(true) {
+        strcpy(rInputString, GetStringInput("\nHow many readers?: "));
+        if (InputChecker(rInputString) == 2) {
+            rAmt = atoi(rInputString);
+            break;
+        }
+        else {printf("\nThat was not a valid input. let's try this again...");}
+    }
+
+    // Get amount of writers (W)
+    char wInputString[256];
+    int wAmt;
+    while(true) {
+        strcpy(wInputString, GetStringInput("\nHow many writers?: "));
+        if (InputChecker(wInputString) == 2) {
+            wAmt = atoi(wInputString);
+            break;
+        }
+        else {printf("\nThat was not a valid input. let's try this again...");}
+    }
+
+    // Get max number of readers that can read the file at once (N)
+    char nInputString[256];
+    int nAmt;
+    while(true) {
+        strcpy(nInputString, GetStringInput("\nHow many readers can read at once?: "));
+        if (InputChecker(nInputString) == 2) {
+            nAmt = atoi(nInputString);
+            break;
+        }
+        else {printf("\nThat was not a valid input. let's try this again...");}
+    }
+
+    readerCap = new Semaphore("readerCap", nAmt);
+    maxReaders = nAmt;
+    remainingWriters = wAmt;
+
+    // Create and fork threads
+    Thread *t;
+    char *name;
+    for (int i = 0; i < rAmt; i++) {
+        name = new char[30];
+        sprintf(name, "%d", i);
+        t = new Thread(name);
+        t->Fork(RunReader, nAmt);
+    }
+
+    for (int i = 0; i < wAmt; i++) {
+        name = new char[30];
+        sprintf(name, "%d", i);
+        t = new Thread(name);
+        t->Fork(RunWriter, 0);
+    }
+}
 // End Project 2
 
 // End code changes by Anthony Guarino
@@ -559,7 +936,14 @@ ThreadTest()
         Thread *t5 = new Thread("MakeSemaphorePhilosopher");
         t5->Fork(MakePhilosopher, 1);
     }
-
+    if (aFlag == 5) {
+        Thread *t6 = new Thread("MakePostOffice");
+        t6->Fork(MakePostOffice, 0);
+    }
+    if (aFlag == 6) {
+        Thread *t7 = new Thread("MakeReaderWriter");
+        t7->Fork(MakeReaderWriter, 0);
+    }
     // End code changes by Anthony Guarino
 
  }

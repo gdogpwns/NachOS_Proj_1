@@ -124,6 +124,12 @@ Initialize(int argc, char **argv)
             else if(!strcmp(*(argv + 1), "4")) {
                 aFlag = 4;
             }
+            else if(!strcmp(*(argv + 1), "5")) {
+                aFlag = 5;
+            }
+            else if(!strcmp(*(argv + 1), "6")) {
+                aFlag = 6;
+            }
             else {
                 printf("\nYou have entered an invalid argument. Exiting...\n");
                 Exit(0);
